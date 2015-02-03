@@ -28,7 +28,7 @@ function JumpRotation(){
 	var globalToLocal = transform.InverseTransformPoint(control.rayHit.point);
 	var globalToLocal2 = transform.InverseTransformPoint(control.rayHit2.point);
 	var globalToLocal3 = transform.InverseTransformPoint(control.rayHit3.point);
-	Debug.Log(globalToLocal.y);
+//	Debug.Log(globalToLocal.y);
 
 	//check if the ray is within range to the ground
 	if(globalToLocal.y > -1.15 || globalToLocal2.y > -1.15 || globalToLocal3.y > -1.15){ //if feels odd change back to 1.3

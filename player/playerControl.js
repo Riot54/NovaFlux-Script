@@ -76,7 +76,7 @@ function Start () {
 }
 
 function Update () {
-		Debug.Log(grounded);
+//		Debug.Log(grounded);
 	var animator: playerAnimator = GetComponent(playerAnimator); 
 
 	pointEmitter.transform.rotation = camFollow.transform.rotation;
@@ -249,4 +249,8 @@ function OnTriggerEnter(other : Collider){
 		pointEmitter.particleSystem.Emit(10);
 		Destroy(other.gameObject);
 	}
+	
+	//else if(other.gameObject.tag == 'CheckPoint'){
+	//	Debug.Log("Checkpoint");
+//	}
 }
