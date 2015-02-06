@@ -1,41 +1,77 @@
-﻿#pragma strict
-
-//Character Locomotion
-
-private var maxSpeed:Vector3;
-public var maxRunSpeed:float = 15;
-public var runSpeed:float = 15;
-private var running:boolean = false;
-
-//Character Jump
+#pragma strict
+//-----------------------
+//Character Settings Dynamic Variables
+//-----------------------
 
 public var maxJumpSpeed:float = 20;
 public var jumpSpeed:float = 100;
-private var jumpTimer:float = 0;
-
 public var maxJumpHeight:float = 1;
-public var jumping:boolean = false;
 
-//Character Mechanics
+public var maxRunSpeed:float = 15;
+
 
 public var gravity:float = 65;
 
-public var floorDetect:boolean = false;
-public var grounded:boolean = false;
+public var jumpAttackHeight:float = 0.8;
+private var jumpAttackDistance:float = 0.5;
+public var runAttackHeight:float = 0.2;
+
+//-----------------------
+//Static Public Variables
+//-----------------------
 
 public var playMusic:boolean;
+public var jumping:boolean = false;
+public var floorDetect:boolean = false;
+public var downHill:boolean = false;
 
-private var constantSpeed:boolean = false;
-
+//Raycasting
 public var rayHit:RaycastHit;
 public var rayHit2:RaycastHit;
 public var rayHit3:RaycastHit;
 
+public var grounded:boolean = false;
+
+//-----------------------
+//Character Locomotion
+//-----------------------
+private var offsetRunSpeed:float;
+private var maxSpeed:Vector3;
+private var running:boolean = false;
+private var jumpTimer:float = 0;
+private var runSpeed:float = 10;
+
+//-----------------------
+//Character Mechanics
+//-----------------------
+
+//Character Attack
+private var attacking:boolean = false;
+private var attackTimer:float = 0.0;
+private var hitBox:GameObject;
+private var hitCollider:BoxCollider;
+private var runAttackDistance:float = 0.5;
+private var onlySetOnce:boolean = true;
+
+//Other
+private var playerDead:boolean = false;
+private var constantSpeed:boolean = false;
+
+private var stopSpeed:float = 100;
+//private var fallOver:boolean = true;
+
+//---------------------
+//Emitters 
+//---------------------
+
 private var floorEmitter:GameObject;
 private var pointEmitter:GameObject;
 
+//---------------------
 //Character Camera Follow
+//---------------------
 
+private var cameraFollow:GameObject;
 private var movePos:GameObject;
 private var moveRot:GameObject;
 
@@ -48,21 +84,10 @@ private var startPos:Vector3;
 private var endPos:Vector3;
 private var camFollow:GameObject;
 
-
-//Character Attack
-private var attacking:boolean = false;
-private var attackTimer:float = 0.0;
-private var hitBox:GameObject;
-private var hitCollider:BoxCollider;
-
-public var jumpAttackHeight:float = 0.8;
-private var jumpAttackDistance:float = 0.5;
-
-public var runAttackHeight:float = 0.2;
-private var runAttackDistance:float = 0.5;
+//Fix for downhill
 
 function Start () {
-
+	cameraFollow = GameObject.Find("CameraFollow");
 	floorEmitter = GameObject.Find("FloorEmitter");
 	pointEmitter = GameObject.Find("PointEmitter");
 	movePos = GameObject.FindWithTag("PlayerPos");
@@ -73,12 +98,12 @@ function Start () {
 	hitCollider = hitBox.GetComponent(BoxCollider);
 	hitCollider.size = Vector3(0, 0, 0);
 	hitCollider.enabled = false;
+	runSpeed = 0;
 }
 
 function Update () {
-//		Debug.Log(grounded);
 	var animator: playerAnimator = GetComponent(playerAnimator); 
-
+	var waypoints: cameraWaypoints = cameraFollow.GetComponent(cameraWaypoints); 
 	pointEmitter.transform.rotation = camFollow.transform.rotation;
 	floorEmitter.transform.localRotation.z = transform.localRotation.z;
 	pointEmitter.transform.position.x = transform.position.x;
@@ -119,93 +144,109 @@ function Update () {
     rayHit3 = hit3;
 
 	animator.JumpRotation();
+	offsetRunSpeed = runSpeed - 4;
 
-	if (Input.GetKey ('d')){
-		running = true;
-	}else{
-		running = false;
-		if(grounded){
-			rigidbody.velocity = Vector3(0, 0, 0);
+	if(!playerDead){
+		if (Input.GetKey ('d')){
+			runSpeed = waypoints.moveSpeed;
+			running = true;
+		}else{
+			running = false;
 		}
-	}
 
-	if (Input.GetKeyDown ('space') && grounded){
-		rigidbody.velocity.y = 0;
-		jumping = true;
-	}
-
-	if (Input.GetKeyDown ('e')){
-		attackTimer = 0;
-		attacking = false;
-		attacking = true;
-	}
-
-	if (Input.GetKeyUp ('space')){
-		jumpTimer = 0;
-		if (jumping){
-			jumping = false;
+		if (Input.GetKeyDown ('space') && grounded){
+			rigidbody.velocity.y = 0;
+			jumping = true;
 		}
-	}
-	if(grounded && !jumping && running){
-		floorEmitter.particleSystem.emissionRate = 7;
-		//floorEmitter.particleSystem.startLifetime = 0.9;
-		animator.FloorDetection();
-	}
-	if(!grounded || !running){
-		//floorEmitter.particleSystem.startLifetime = 0.2;
-		floorEmitter.particleSystem.emissionRate = 0;
+
+		if (Input.GetKeyDown ('e')){
+			attackTimer = 0;
+			attacking = false;
+			attacking = true;
+		}
+
+		if (Input.GetKeyUp ('space')){
+			jumpTimer = 0;
+			if (jumping){
+				jumping = false;
+			}
+		}
+		if(grounded && !jumping && running){
+			floorEmitter.particleSystem.emissionRate = 7;
+			//floorEmitter.particleSystem.startLifetime = 0.9;
+			animator.FloorDetection();
+		}
+		if(!grounded || !running){
+			//floorEmitter.particleSystem.startLifetime = 0.2;
+			floorEmitter.particleSystem.emissionRate = 0;
+		}
 	}
 
 }
 
 function FixedUpdate(){
+	var waypoints: cameraWaypoints = cameraFollow.GetComponent(cameraWaypoints); 
 	startPos = transform.position;
     endPos = movePos.transform.position;
 	moveDistance = Vector3.Distance(endPos, transform.position);
-	
-	if(!grounded && !jumping){
-		//if in the air and not in a jump apply force back down
-		jumpTimer = 0;
-		rigidbody.AddForce (-transform.up * gravity);
-	}
-	if (running && grounded){
-		if (!playMusic){
-			playMusic = true;
+	Debug.Log(runSpeed);
+	//Debug.Log(offsetRunSpeed);
+	if(!playerDead){
+		if(!grounded && !jumping){
+			//if in the air and not in a jump apply force back down
+			jumpTimer = 0;
+			rigidbody.AddForce (-transform.up * gravity);
 		}
+		if(grounded){
+			if (running){
+				if (!playMusic){
+					playMusic = true;
+				}
 
-			/*currentLerpTime += Time.deltaTime;
-			var t:float = currentLerpTime / lerpTime;
-			t = 1f - Mathf.Cos(t * Mathf.PI * 0.5);
-			transform.position = Vector3.Lerp(startPos, endPos, t);*/
+				if(moveDistance * 2 <= camFollow.rigidbody.velocity.x){
+					rigidbody.velocity = (transform.right * offsetRunSpeed);
+				}else{
+					rigidbody.velocity = (transform.right * moveDistance) * 2;
+				}
 
-		if(moveDistance * 2 <= camFollow.rigidbody.velocity.x){
-			rigidbody.velocity = (transform.right * 20);
+			}else{
+
+				//runSpeed = Mathf.Lerp(lastSpeed, 0, stopSpeed * Time.deltaTime * stopSmooth);
+				//rigidbody.velocity = Vector3(0, 0, 0);
+				rigidbody.velocity = (transform.right * runSpeed);
+			}
 		}else{
-			rigidbody.velocity = (transform.right * moveDistance) * 2;
+			if(running){
+				if(moveDistance <= camFollow.rigidbody.velocity.x && !downHill){
+					if(transform.eulerAngles.z < 20 && transform.eulerAngles.z >= -10 || transform.eulerAngles.z <= 360 && transform.eulerAngles.z >= 270 ){
+						rigidbody.velocity.x = runSpeed;
+					}
+				}
+			}
 		}
 
-	}
 
-	if(running && !grounded){
-		if(moveDistance <= camFollow.rigidbody.velocity.x){
-			rigidbody.velocity.x = 20;
+
+		if(jumping){
+			jumpTimer += Time.fixedDeltaTime * 10;
+			Jump();
+		}
+
+		if(attacking){
+			attackTimer += Time.fixedDeltaTime;
+			Attack();
 		}else{
-			//var moveDirection : Vector3 = (endPos - transform.position);
-
-			//rigidbody.velocity.x = (moveDirection.x * moveDistance) /2;
+			attackTimer = 0;
 		}
-	}
-
-	if(jumping){
-		jumpTimer += Time.fixedDeltaTime * 10;
-		Jump();
-	}
-
-	if(attacking){
-		attackTimer += Time.fixedDeltaTime;
-		Attack();
+		if(!running){
+			runSpeed -= Time.deltaTime * stopSpeed;
+			if(runSpeed <= 0){
+				runSpeed = 0;
+			}
+		}
 	}else{
-		attackTimer = 0;
+		rigidbody.velocity = Vector3.zero;
+		Application.LoadLevel ("testingWorld");
 	}
 }
 
@@ -213,15 +254,17 @@ function Jump(){
 	if(jumpTimer > maxJumpHeight){
 		jumping = false;
 	}else{
-		//rigidbody.velocity = transform.up * 24;
-		rigidbody.velocity.y = 24;
-		//rigidbody.AddForce(transform.up * jumpSpeed);
-		
-		//var maxJump = transform.up * maxJumpSpeed;
+		var xLocalVel = transform.InverseTransformDirection(rigidbody.velocity).x;
 
-		//if (rigidbody.velocity.y > maxJump.y){
-			//rigidbody.velocity.y = maxJump.y;
-		//}
+		if(!downHill){
+			if(transform.eulerAngles.z < 20 && transform.eulerAngles.z >= -10 || transform.eulerAngles.z <= 360 && transform.eulerAngles.z >= 270){
+				rigidbody.velocity.y = runSpeed;
+			}else{
+				rigidbody.velocity = rigidbody.velocity + (transform.up * 4);
+			}
+		}else{
+			rigidbody.velocity = rigidbody.velocity + (transform.up * 4);
+		}
 	}
 }
 
@@ -249,8 +292,16 @@ function OnTriggerEnter(other : Collider){
 		pointEmitter.particleSystem.Emit(10);
 		Destroy(other.gameObject);
 	}
-	
-	//else if(other.gameObject.tag == 'CheckPoint'){
-	//	Debug.Log("Checkpoint");
-//	}
+	if(other.gameObject.tag == 'DownHill'){
+		downHill = true;
+	}
+	if(other.gameObject.tag == 'Death'){
+		playerDead = true;
+	}
+}
+
+function OnTriggerExit(other:Collider){
+	if(other.gameObject.tag == 'DownHill'){
+		downHill = false;
+	}
 }
