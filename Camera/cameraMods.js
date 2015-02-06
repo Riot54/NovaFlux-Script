@@ -1,13 +1,15 @@
-﻿#pragma strict
+#pragma strict
 
 public var moveSpeed:float = 18;
 
 public var smooth:float = 10;
 
-public var zoomAmount:float = 0;
+public var zoom:float = 60;
 
 public var staticCam:boolean = false;
 public var pauseCam:boolean = false;
+
+public var camPosition:int = 1;
 
 function Start () {
 
