@@ -1,16 +1,7 @@
-﻿#pragma strict
-
-private var offsetAmount:float = 1.1;
-
-private var grounded:boolean = false;
-
-private var posSmoothDamp:float = 0.3; // old was 6
-private var posSpeed:float = 50;
-
 private var rotSmooth:float = 10;
 private var rotSpeed:float = 0.3;
 
-private var rotLandSmooth:float = 10;
+private var rotLandSmooth:float = 20;
 private var rotLandSpeed:float = 0.5;
 
 private var playerVelocity = Vector3.zero;
@@ -22,14 +13,13 @@ private var rayHit3:RaycastHit;
 public var hitWorldPoint:Vector3;
 
 function JumpRotation(){
+
 	var control: playerControl = GetComponent(playerControl); 
 
 	//get the local position of the ray to ground point (more relyable then hit.distance)
 	var globalToLocal = transform.InverseTransformPoint(control.rayHit.point);
 	var globalToLocal2 = transform.InverseTransformPoint(control.rayHit2.point);
 	var globalToLocal3 = transform.InverseTransformPoint(control.rayHit3.point);
-//	Debug.Log(globalToLocal.y);
-
 	//check if the ray is within range to the ground
 	if(globalToLocal.y > -1.15 || globalToLocal2.y > -1.15 || globalToLocal3.y > -1.15){ //if feels odd change back to 1.3
 		control.grounded = true;
@@ -37,16 +27,35 @@ function JumpRotation(){
 	if(globalToLocal.y <= -1.15 && globalToLocal2.y <= -1.15 && globalToLocal3.y <= -1.15){
 		control.grounded = false;
 	}
+	var axis = Vector3.Cross(-transform.up,-control.rayHit.normal);
+	var angle = Mathf.Atan2(Vector3.Magnitude(axis), Vector3.Dot(-transform.up,-control.rayHit.normal));
 
-	if(globalToLocal.y <= -3 && globalToLocal2.y <= -3 && globalToLocal3.y <= -3){
-		//once in the air rotate upright
+	if(control.downHill == false){
 		var jumpRotation = Quaternion.Euler(0, 0, 0);
-		transform.localRotation = Quaternion.Lerp(transform.localRotation, jumpRotation, rotSpeed * Time.deltaTime * rotSmooth);
-	}
-	if(globalToLocal.y > -3 && globalToLocal.y < -1.15 || globalToLocal2.y > -3 && globalToLocal2.y < -1.15 || globalToLocal3.y > -3 && globalToLocal3.y < -1.15){
-		//smooth the player landing fixing angular snap
 		var jumpRotationLand = Quaternion.FromToRotation(transform.up, control.rayHit.normal);
-		transform.localRotation = Quaternion.Slerp(transform.localRotation, jumpRotationLand, rotLandSpeed * Time.deltaTime * rotLandSmooth);
+		if(transform.eulerAngles.z < 20 && transform.eulerAngles.z >= -10 || transform.eulerAngles.z <= 360 && transform.eulerAngles.z >= 270){
+
+			if(globalToLocal.y <= -3 && globalToLocal2.y <= -3 && globalToLocal3.y <= -3){
+				//once in the air rotate upright
+				transform.localRotation = Quaternion.Lerp(transform.localRotation, jumpRotation, rotSpeed * Time.deltaTime * rotSmooth);
+			}
+			if(globalToLocal.y > -3 && globalToLocal.y < -1.15 || globalToLocal2.y > -3 && globalToLocal2.y < -1.15 || globalToLocal3.y > -3 && globalToLocal3.y < -1.15){
+				//smooth the player landing fixing angular snap
+				transform.localRotation = Quaternion.Slerp(transform.localRotation, jumpRotationLand, rotLandSpeed * Time.deltaTime * rotLandSmooth);
+			}
+		}else{
+			//if(globalToLocal.y <= -3 && globalToLocal2.y <= -3 && globalToLocal3.y <= -3){
+				//once in the air rotate around
+				transform.RotateAround(axis,angle);
+			//}
+			/*if(globalToLocal.y > 1 && globalToLocal2.y > 1 && globalToLocal3.y > 1){
+				//once in the air rotate upright
+				transform.localRotation = Quaternion.Lerp(transform.localRotation, jumpRotation, rotSpeed * Time.deltaTime * rotSmooth);
+			}*/
+		}
+	}else{
+		//once in the air rotate upright
+		transform.RotateAround(axis,angle);
 	}
 }
 
